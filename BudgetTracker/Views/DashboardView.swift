@@ -223,6 +223,18 @@ struct DashboardView: View {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
+        if let categories = data.customCategories {
+            for catData in categories {
+                let category = CustomCategory(
+                    id: UUID(uuidString: catData.id) ?? UUID(),
+                    name: catData.name,
+                    icon: catData.icon,
+                    colorName: catData.colorName
+                )
+                modelContext.insert(category)
+            }
+        }
+
         for weekData in data.weeks {
             let week = Week(
                 date: dateFormatter.date(from: weekData.date) ?? Date(),
@@ -235,6 +247,25 @@ struct DashboardView: View {
                 savings: weekData.savings
             )
             modelContext.insert(week)
+        }
+
+        if let expenses = data.expenses {
+            for expData in expenses {
+                let customId = expData.customCategoryId.flatMap { UUID(uuidString: $0) }
+                let category = ExpenseCategory(rawValue: expData.category) ?? .other
+                let expense = Expense(
+                    id: UUID(uuidString: expData.id) ?? UUID(),
+                    date: dateFormatter.date(from: expData.date) ?? Date(),
+                    amount: expData.amount,
+                    category: category,
+                    customCategoryId: customId,
+                    note: expData.note
+                )
+                if customId != nil {
+                    expense.categoryRaw = expData.category
+                }
+                modelContext.insert(expense)
+            }
         }
 
         withAnimation { showSyncSuccess = true }
