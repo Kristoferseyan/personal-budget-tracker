@@ -11,6 +11,7 @@ struct BudgetTrackerApp: App {
             Week.self,
             Expense.self,
             CustomCategory.self,
+            WishlistItem.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -19,11 +19,17 @@ struct ContentView: View {
                 }
                 .tag(1)
 
+            WishlistView()
+                .tabItem {
+                    Label("Wishlist", systemImage: "gift.fill")
+                }
+                .tag(2)
+
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "clock.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(.green)
     }
