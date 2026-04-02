@@ -19,6 +19,7 @@ struct ExpensesView: View {
     @Query(sort: \Expense.date, order: .reverse) private var allExpenses: [Expense]
     @Query(sort: \Week.date, order: .reverse) private var weeks: [Week]
     @Query private var customCategories: [CustomCategory]
+    @Query private var wishlistItems: [WishlistItem]
 
     @StateObject private var syncService = SyncService.shared
     @Binding var showAddExpense: Bool
@@ -173,7 +174,7 @@ struct ExpensesView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {
                         Task {
-                            await syncService.pushToServer(weeks: weeks, expenses: allExpenses, customCategories: customCategories)
+                            await syncService.pushToServer(weeks: weeks, expenses: allExpenses, customCategories: customCategories, wishlistItems: wishlistItems)
                             if syncService.syncError == nil {
                                 withAnimation { showSyncSuccess = true }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

@@ -6,6 +6,7 @@ struct DashboardView: View {
     @Query(sort: \Week.date, order: .reverse) private var weeks: [Week]
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
     @Query private var customCategories: [CustomCategory]
+    @Query private var wishlistItems: [WishlistItem]
 
     @StateObject private var syncService = SyncService.shared
     @AppStorage("savingsAdjustment") private var savingsAdjustment: Double = 0
@@ -146,7 +147,7 @@ struct DashboardView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {
                         Task {
-                            await syncService.pushToServer(weeks: weeks, expenses: expenses, customCategories: customCategories)
+                            await syncService.pushToServer(weeks: weeks, expenses: expenses, customCategories: customCategories, wishlistItems: wishlistItems)
                             if syncService.syncError == nil {
                                 withAnimation {
                                     showSyncSuccess = true
@@ -217,7 +218,7 @@ struct DashboardView: View {
                             isRestoring = false
                         }
                     } else {
-                        await syncService.pushToServer(weeks: weeks, expenses: expenses, customCategories: customCategories)
+                        await syncService.pushToServer(weeks: weeks, expenses: expenses, customCategories: customCategories, wishlistItems: wishlistItems)
                         if syncService.syncError == nil {
                             withAnimation { showSyncSuccess = true }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -276,6 +277,20 @@ struct DashboardView: View {
                     expense.categoryRaw = expData.category
                 }
                 modelContext.insert(expense)
+            }
+        }
+
+        if let items = data.wishlistItems {
+            for itemData in items {
+                let item = WishlistItem(
+                    id: UUID(uuidString: itemData.id) ?? UUID(),
+                    name: itemData.name,
+                    estimatedPrice: itemData.estimatedPrice,
+                    notes: itemData.notes,
+                    isPurchased: itemData.isPurchased,
+                    dateAdded: dateFormatter.date(from: itemData.dateAdded) ?? Date()
+                )
+                modelContext.insert(item)
             }
         }
 

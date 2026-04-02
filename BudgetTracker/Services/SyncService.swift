@@ -31,11 +31,21 @@ struct SyncCustomCategoryData: Codable {
     let colorName: String
 }
 
+struct SyncWishlistItemData: Codable {
+    let id: String
+    let name: String
+    let estimatedPrice: Double
+    let notes: String
+    let isPurchased: Bool
+    let dateAdded: String
+}
+
 struct SyncBudgetData: Codable {
     let startingBalance: Double
     let weeks: [SyncWeekData]
     let expenses: [SyncExpenseData]?
     let customCategories: [SyncCustomCategoryData]?
+    let wishlistItems: [SyncWishlistItemData]?
     let lastModified: String
 }
 
@@ -74,7 +84,7 @@ class SyncService: ObservableObject {
     // MARK: - Public Methods
 
     /// Sync data to server (push local data)
-    func pushToServer(weeks: [Week], expenses: [Expense] = [], customCategories: [CustomCategory] = []) async {
+    func pushToServer(weeks: [Week], expenses: [Expense] = [], customCategories: [CustomCategory] = [], wishlistItems: [WishlistItem] = []) async {
         guard !isSyncing else { return }
 
         isSyncing = true
@@ -86,6 +96,7 @@ class SyncService: ObservableObject {
                 weeks: weeks.map { weekToSyncData($0) },
                 expenses: expenses.map { expenseToSyncData($0) },
                 customCategories: customCategories.map { customCategoryToSyncData($0) },
+                wishlistItems: wishlistItems.map { wishlistItemToSyncData($0) },
                 lastModified: dateFormatter.string(from: Date())
             )
 
@@ -211,6 +222,17 @@ class SyncService: ObservableObject {
             name: category.name,
             icon: category.icon,
             colorName: category.colorName
+        )
+    }
+
+    private func wishlistItemToSyncData(_ item: WishlistItem) -> SyncWishlistItemData {
+        SyncWishlistItemData(
+            id: item.id.uuidString,
+            name: item.name,
+            estimatedPrice: item.estimatedPrice,
+            notes: item.notes,
+            isPurchased: item.isPurchased,
+            dateAdded: displayDateFormatter.string(from: item.dateAdded)
         )
     }
 }
