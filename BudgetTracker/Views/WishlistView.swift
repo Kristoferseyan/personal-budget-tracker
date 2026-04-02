@@ -180,19 +180,33 @@ struct WishlistRow: View {
                     .strikethrough(item.isPurchased)
                     .foregroundColor(item.isPurchased ? .secondary : .primary)
 
-                if !item.notes.isEmpty {
-                    Text(item.notes)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                HStack(spacing: 4) {
+                    if !item.notes.isEmpty {
+                        Text(item.notes)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
 
             Spacer()
 
-            Text(item.estimatedPrice.asPHP)
-                .fontWeight(.semibold)
-                .foregroundColor(item.isPurchased ? .secondary : .primary)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(item.estimatedPrice.asPHP)
+                    .fontWeight(.semibold)
+                    .foregroundColor(item.isPurchased ? .secondary : .primary)
+
+                if item.priority != .none && !item.isPurchased {
+                    HStack(spacing: 3) {
+                        Image(systemName: item.priority.icon)
+                        Text(item.priority.label)
+                    }
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(item.priority.color)
+                }
+            }
         }
         .padding(.vertical, 4)
     }

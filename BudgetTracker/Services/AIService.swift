@@ -30,6 +30,7 @@ class AIService: ObservableObject {
     @Published var isAnalyzing = false
     @Published var lastAnalysis: String?
     @Published var error: String?
+    @Published var prioritiesAssigned = false
 
     private let ollamaHost = "http://localhost:11434"
     private let model = "qwen3:8b"
@@ -147,6 +148,8 @@ class AIService: ObservableObject {
             let chatResponse = try JSONDecoder().decode(OllamaChatResponse.self, from: data)
             lastAnalysis = stripMarkdown(chatResponse.message.content)
 
+            await assignPriorities(items: items, analysis: chatResponse.message.content)
+
         } catch let urlError as URLError {
             error = "Can't reach Ollama (\(urlError.code.rawValue)): \(urlError.localizedDescription)"
         } catch {
@@ -154,6 +157,77 @@ class AIService: ObservableObject {
         }
 
         isAnalyzing = false
+    }
+
+    private func assignPriorities(items: [WishlistItem], analysis: String) async {
+        prioritiesAssigned = false
+
+        let itemNames = items.filter { !$0.isPurchased }.map { $0.name }
+
+        let prompt = """
+        Based on this budget analysis, assign a priority to each wishlist item.
+
+        Analysis:
+        \(analysis)
+
+        Items to prioritize:
+        \(itemNames.joined(separator: ", "))
+
+        Respond ONLY with a JSON object mapping each item name to its priority.
+        Priorities: "high" (buy first/need), "medium" (can wait), "low" (low priority), "skip" (should not buy).
+        Example: {"Item A": "high", "Item B": "skip"}
+        Respond with ONLY the JSON, no other text.
+        """
+
+        do {
+            let request = OllamaChatRequest(
+                model: model,
+                messages: [OllamaChatMessage(role: "user", content: prompt)],
+                stream: false,
+                options: OllamaOptions(num_predict: 256),
+                think: false
+            )
+
+            guard let url = URL(string: "\(ollamaHost)/api/chat") else { return }
+
+            var urlRequest = URLRequest(url: url)
+            urlRequest.httpMethod = "POST"
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            urlRequest.httpBody = try JSONEncoder().encode(request)
+            urlRequest.timeoutInterval = 120
+
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else { return }
+
+            let chatResponse = try JSONDecoder().decode(OllamaChatResponse.self, from: data)
+            let content = chatResponse.message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Extract JSON from response (might have extra text)
+            guard let jsonStart = content.firstIndex(of: "{"),
+                  let jsonEnd = content.lastIndex(of: "}") else { return }
+
+            let jsonString = String(content[jsonStart...jsonEnd])
+            guard let jsonData = jsonString.data(using: .utf8),
+                  let priorities = try? JSONDecoder().decode([String: String].self, from: jsonData) else { return }
+
+            for item in items where !item.isPurchased {
+                if let priorityStr = priorities[item.name]?.lowercased() {
+                    switch priorityStr {
+                    case "high": item.priority = .high
+                    case "medium": item.priority = .medium
+                    case "low": item.priority = .low
+                    case "skip": item.priority = .skip
+                    default: break
+                    }
+                }
+            }
+
+            prioritiesAssigned = true
+        } catch {
+            print("Priority assignment failed: \(error)")
+        }
     }
 
     private func stripMarkdown(_ text: String) -> String {

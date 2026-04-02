@@ -288,7 +288,8 @@ struct DashboardView: View {
                     estimatedPrice: itemData.estimatedPrice,
                     notes: itemData.notes,
                     isPurchased: itemData.isPurchased,
-                    dateAdded: dateFormatter.date(from: itemData.dateAdded) ?? Date()
+                    dateAdded: dateFormatter.date(from: itemData.dateAdded) ?? Date(),
+                    priority: WishlistPriority(rawValue: itemData.priorityValue ?? 0) ?? .none
                 )
                 modelContext.insert(item)
             }

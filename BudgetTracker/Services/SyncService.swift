@@ -38,6 +38,7 @@ struct SyncWishlistItemData: Codable {
     let notes: String
     let isPurchased: Bool
     let dateAdded: String
+    let priorityValue: Int?
 }
 
 struct SyncBudgetData: Codable {
@@ -232,7 +233,8 @@ class SyncService: ObservableObject {
             estimatedPrice: item.estimatedPrice,
             notes: item.notes,
             isPurchased: item.isPurchased,
-            dateAdded: displayDateFormatter.string(from: item.dateAdded)
+            dateAdded: displayDateFormatter.string(from: item.dateAdded),
+            priorityValue: item.priorityValue
         )
     }
 }
