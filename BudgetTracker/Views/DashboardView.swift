@@ -9,11 +9,12 @@ struct DashboardView: View {
 
     @StateObject private var syncService = SyncService.shared
     @AppStorage("savingsAdjustment") private var savingsAdjustment: Double = 0
+    @AppStorage("savingsGoal") private var savingsGoal: Double = 50_000
     @State private var showSyncSuccess = false
     @State private var showingAddWeek = false
-    @State private var showRestoreAlert = false
     @State private var showAdjustBalance = false
-    @State private var serverData: SyncBudgetData?
+    @State private var showEditGoal = false
+    @State private var isRestoring = false
 
     private var totalWeekSavings: Double {
         weeks.reduce(0) { $0 + $1.savings }
@@ -92,7 +93,7 @@ struct DashboardView: View {
     }
 
     private var weeksToGo: Int {
-        let remaining = BudgetConfig.goal - totalSavings
+        let remaining = savingsGoal - totalSavings
         guard remaining > 0 else { return 0 }
         return Int(ceil(remaining / BudgetConfig.defaultSavings))
     }
@@ -101,9 +102,12 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    LargeProgressView(current: totalSavings, goal: BudgetConfig.goal)
+                    LargeProgressView(current: totalSavings, goal: savingsGoal)
                         .onTapGesture {
                             showAdjustBalance = true
+                        }
+                        .onLongPressGesture {
+                            showEditGoal = true
                         }
 
                     HStack(spacing: 16) {
@@ -186,14 +190,31 @@ struct DashboardView: View {
                     savingsAdjustment: $savingsAdjustment
                 )
             }
+            .sheet(isPresented: $showEditGoal) {
+                EditGoalView(savingsGoal: $savingsGoal)
+            }
+            .overlay {
+                if isRestoring {
+                    ZStack {
+                        Color(.systemBackground).opacity(0.9)
+                        VStack(spacing: 12) {
+                            ProgressView()
+                            Text("Restoring your data...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
             .onAppear {
                 Task {
                     guard await syncService.checkConnection() else { return }
 
                     if weeks.isEmpty && expenses.isEmpty && customCategories.isEmpty {
                         if let data = await syncService.fetchFromServer(), !data.weeks.isEmpty {
-                            serverData = data
-                            showRestoreAlert = true
+                            isRestoring = true
+                            restoreFromServer(data)
+                            isRestoring = false
                         }
                     } else {
                         await syncService.pushToServer(weeks: weeks, expenses: expenses, customCategories: customCategories)
@@ -206,20 +227,10 @@ struct DashboardView: View {
                     }
                 }
             }
-            .alert("Restore Data?", isPresented: $showRestoreAlert) {
-                Button("Restore") {
-                    restoreFromServer()
-                }
-                Button("Start Fresh", role: .cancel) {}
-            } message: {
-                Text("Found \(serverData?.weeks.count ?? 0) weeks on your server. Restore this data?")
-            }
         }
     }
 
-    private func restoreFromServer() {
-        guard let data = serverData else { return }
-
+    private func restoreFromServer(_ data: SyncBudgetData) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
@@ -391,6 +402,60 @@ struct AdjustBalanceView: View {
             }
             .onAppear {
                 actualBalance = calculatedSavings + savingsAdjustment
+            }
+        }
+    }
+}
+
+struct EditGoalView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var savingsGoal: Double
+    @State private var newGoal: Double = 0
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Current Goal")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(savingsGoal.asPHP)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Section("New Goal") {
+                    HStack {
+                        Text("₱")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                        TextField("0", value: $newGoal, format: .number)
+                            .keyboardType(.numberPad)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                }
+            }
+            .navigationTitle("Edit Goal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        savingsGoal = newGoal
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(newGoal <= 0)
+                }
+            }
+            .onAppear {
+                newGoal = savingsGoal
             }
         }
     }
