@@ -9,6 +9,7 @@ struct WishlistView: View {
 
     @StateObject private var aiService = AIService.shared
     @AppStorage("savingsAdjustment") private var savingsAdjustment: Double = 0
+    @AppStorage("savingsGoal") private var savingsGoal: Double = 50_000
 
     @State private var showAddItem = false
     @State private var showAIAnalysis = false
@@ -128,8 +129,11 @@ struct WishlistView: View {
                             await aiService.analyzeWishlist(
                                 items: items,
                                 totalSavings: totalSavings,
+                                savingsGoal: savingsGoal,
                                 weeklyIncome: weeks.first?.income ?? BudgetConfig.defaultIncome,
-                                weeklySavings: weeks.first?.savings ?? BudgetConfig.defaultSavings
+                                weeklySavings: weeks.first?.savings ?? BudgetConfig.defaultSavings,
+                                weeks: Array(weeks),
+                                expenses: Array(expenses)
                             )
                         }
                     } label: {
@@ -250,53 +254,93 @@ struct AIAnalysisView: View {
     @State private var elapsedSeconds = 0
     @State private var timer: Timer?
 
+    private var sections: [AnalysisSection] {
+        guard let text = aiService.lastAnalysis else { return [] }
+        return parseAnalysis(text)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if aiService.isAnalyzing {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 24) {
                         Spacer()
 
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .padding(.bottom, 8)
+                        ZStack {
+                            Circle()
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 4)
+                                .frame(width: 80, height: 80)
+                            Circle()
+                                .trim(from: 0, to: min(Double(elapsedSeconds) / 90.0, 0.95))
+                                .stroke(Color.purple, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 1), value: elapsedSeconds)
+                            Image(systemName: "sparkles")
+                                .font(.title)
+                                .foregroundColor(.purple)
+                        }
 
-                        Text("Analyzing your wishlist...")
-                            .font(.headline)
+                        VStack(spacing: 8) {
+                            Text("Analyzing your wishlist")
+                                .font(.title3)
+                                .fontWeight(.semibold)
 
-                        Text("Qwen is thinking about your spending decisions")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                            Text("Qwen is evaluating your spending decisions")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
 
                         Text("\(elapsedSeconds)s")
-                            .font(.caption)
+                            .font(.system(.body, design: .monospaced))
                             .foregroundColor(.secondary)
-                            .monospacedDigit()
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
 
-                        Text("This usually takes 30-90 seconds")
-                            .font(.caption2)
+                        Text("Usually takes 30-90 seconds")
+                            .font(.caption)
                             .foregroundColor(.secondary)
 
                         Spacer()
                     }
                     .padding()
                 } else if let error = aiService.error {
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.largeTitle)
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 48))
                             .foregroundColor(.orange)
+                        Text("Couldn't reach AI")
+                            .font(.title3)
+                            .fontWeight(.semibold)
                         Text(error)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        Spacer()
                     }
-                    .padding()
-                } else if let analysis = aiService.lastAnalysis {
+                } else if !sections.isEmpty {
                     ScrollView {
-                        Text(analysis)
-                            .font(.body)
-                            .padding()
+                        VStack(spacing: 16) {
+                            HStack {
+                                Image(systemName: "sparkles")
+                                    .foregroundColor(.purple)
+                                Text("AI Recommendation")
+                                    .font(.headline)
+                                Spacer()
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+
+                            ForEach(sections) { section in
+                                AnalysisSectionCard(section: section)
+                            }
+                        }
+                        .padding(.bottom, 20)
                     }
                 }
             }
@@ -322,6 +366,132 @@ struct AIAnalysisView: View {
                 timer = nil
             }
         }
+    }
+
+    private func parseAnalysis(_ text: String) -> [AnalysisSection] {
+        let sectionPatterns: [(String, String, Color)] = [
+            ("prioritize", "arrow.up.circle.fill", .green),
+            ("skip", "hand.raised.fill", .red),
+            ("delay", "clock.fill", .orange),
+            ("purchase order", "list.number", .blue),
+            ("timeline", "calendar", .blue),
+            ("red flag", "flag.fill", .red),
+            ("warning", "exclamationmark.triangle.fill", .orange),
+        ]
+
+        let lines = text.components(separatedBy: "\n")
+        var sections: [AnalysisSection] = []
+        var currentTitle = ""
+        var currentLines: [String] = []
+        var currentIcon = "lightbulb.fill"
+        var currentColor: Color = .purple
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+
+            let lower = trimmed.lowercased()
+            var isHeader = false
+
+            if let firstChar = trimmed.first, firstChar.isNumber && trimmed.contains(".") {
+                let afterNumber = String(trimmed.drop(while: { $0.isNumber || $0 == "." || $0 == " " }))
+                if !afterNumber.isEmpty {
+                    let headerCheck = afterNumber.lowercased()
+                    for (keyword, icon, color) in sectionPatterns {
+                        if headerCheck.contains(keyword) {
+                            if !currentTitle.isEmpty {
+                                sections.append(AnalysisSection(
+                                    title: currentTitle,
+                                    content: currentLines.joined(separator: "\n"),
+                                    icon: currentIcon,
+                                    color: currentColor
+                                ))
+                            }
+                            currentTitle = afterNumber
+                            currentLines = []
+                            currentIcon = icon
+                            currentColor = color
+                            isHeader = true
+                            break
+                        }
+                    }
+
+                    if !isHeader && currentTitle.isEmpty {
+                        currentTitle = afterNumber
+                        currentLines = []
+                        currentIcon = "lightbulb.fill"
+                        currentColor = .purple
+                        isHeader = true
+                    }
+                }
+            }
+
+            if !isHeader {
+                let cleaned = trimmed
+                    .replacingOccurrences(of: "^[-*]\\s*", with: "", options: .regularExpression)
+                currentLines.append(cleaned)
+            }
+        }
+
+        if !currentTitle.isEmpty {
+            sections.append(AnalysisSection(
+                title: currentTitle,
+                content: currentLines.joined(separator: "\n"),
+                icon: currentIcon,
+                color: currentColor
+            ))
+        }
+
+        if sections.isEmpty && !text.isEmpty {
+            sections.append(AnalysisSection(
+                title: "Analysis",
+                content: text,
+                icon: "lightbulb.fill",
+                color: .purple
+            ))
+        }
+
+        return sections
+    }
+}
+
+struct AnalysisSection: Identifiable {
+    let id = UUID()
+    let title: String
+    let content: String
+    let icon: String
+    let color: Color
+}
+
+struct AnalysisSectionCard: View {
+    let section: AnalysisSection
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: section.icon)
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .frame(width: 28, height: 28)
+                    .background(section.color)
+                    .cornerRadius(6)
+
+                Text(section.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+
+            Text(section.content)
+                .font(.body)
+                .foregroundColor(.primary.opacity(0.85))
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .padding(.horizontal)
     }
 }
 

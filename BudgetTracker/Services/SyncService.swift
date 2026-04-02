@@ -50,8 +50,8 @@ struct SyncResponse: Codable {
 class SyncService: ObservableObject {
     static let shared = SyncService()
 
-    private let baseURL = "https://your-server.example.com"
-    private let apiKey = "your-api-key"
+    private let baseURL = "https://budget.seannuevo.dev"
+    private let apiKey = "sean-budget-2026-secret"
 
     @Published var isSyncing = false
     @Published var lastSyncTime: Date?

@@ -48,12 +48,12 @@ func fetchBudgetSummary() async -> BudgetSummary {
     let defaultAllowance = 1500.0
     let fallback = BudgetSummary(allowance: defaultAllowance, spent: 0, remaining: defaultAllowance, totalSaved: 0, weeksToGo: 10)
 
-    guard let url = URL(string: "https://your-server.example.com/budget") else {
+    guard let url = URL(string: "https://budget.seannuevo.dev/budget") else {
         return fallback
     }
 
     var request = URLRequest(url: url)
-    request.setValue("your-api-key", forHTTPHeaderField: "X-API-Key")
+    request.setValue("sean-budget-2026-secret", forHTTPHeaderField: "X-API-Key")
     request.timeoutInterval = 10
 
     do {
