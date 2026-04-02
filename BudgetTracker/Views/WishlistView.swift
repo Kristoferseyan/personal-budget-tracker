@@ -370,7 +370,10 @@ struct AIAnalysisView: View {
 
     private func parseAnalysis(_ text: String) -> [AnalysisSection] {
         let sectionPatterns: [(String, String, Color)] = [
+            ("saving", "banknote.fill", .green),
             ("prioritize", "arrow.up.circle.fill", .green),
+            ("prioritization", "arrow.up.circle.fill", .green),
+            ("spending", "chart.bar.fill", .purple),
             ("skip", "hand.raised.fill", .red),
             ("delay", "clock.fill", .orange),
             ("purchase order", "list.number", .blue),
@@ -390,39 +393,35 @@ struct AIAnalysisView: View {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { continue }
 
-            let lower = trimmed.lowercased()
             var isHeader = false
 
             if let firstChar = trimmed.first, firstChar.isNumber && trimmed.contains(".") {
                 let afterNumber = String(trimmed.drop(while: { $0.isNumber || $0 == "." || $0 == " " }))
                 if !afterNumber.isEmpty {
+                    if !currentTitle.isEmpty {
+                        sections.append(AnalysisSection(
+                            title: currentTitle,
+                            content: currentLines.joined(separator: "\n"),
+                            icon: currentIcon,
+                            color: currentColor
+                        ))
+                    }
+
+                    currentTitle = afterNumber
+                    currentLines = []
+                    currentIcon = "lightbulb.fill"
+                    currentColor = .purple
+
                     let headerCheck = afterNumber.lowercased()
                     for (keyword, icon, color) in sectionPatterns {
                         if headerCheck.contains(keyword) {
-                            if !currentTitle.isEmpty {
-                                sections.append(AnalysisSection(
-                                    title: currentTitle,
-                                    content: currentLines.joined(separator: "\n"),
-                                    icon: currentIcon,
-                                    color: currentColor
-                                ))
-                            }
-                            currentTitle = afterNumber
-                            currentLines = []
                             currentIcon = icon
                             currentColor = color
-                            isHeader = true
                             break
                         }
                     }
 
-                    if !isHeader && currentTitle.isEmpty {
-                        currentTitle = afterNumber
-                        currentLines = []
-                        currentIcon = "lightbulb.fill"
-                        currentColor = .purple
-                        isHeader = true
-                    }
+                    isHeader = true
                 }
             }
 
