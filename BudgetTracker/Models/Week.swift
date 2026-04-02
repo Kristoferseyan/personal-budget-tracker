@@ -50,7 +50,8 @@ enum BudgetConfig {
     static let defaultMom: Double = 1_000
     static let defaultBills: Double = 275
     static let defaultAllowance: Double = 1_500
-    static let defaultSavings: Double = 5_225
+    static let defaultSavings: Double = 5_000
+    static let savingsGoal: Double = 5_000
 }
 
 // MARK: - Currency Formatter

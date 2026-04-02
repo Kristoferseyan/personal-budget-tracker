@@ -11,6 +11,7 @@ struct EditWeekView: View {
     @State private var allowance: Double
     @State private var extraExpenses: Double
     @State private var extraExpensesNote: String
+    @State private var savings: Double
 
     init(week: Week) {
         self.week = week
@@ -20,10 +21,11 @@ struct EditWeekView: View {
         _allowance = State(initialValue: week.allowance)
         _extraExpenses = State(initialValue: week.extraExpenses)
         _extraExpensesNote = State(initialValue: week.extraExpensesNote)
+        _savings = State(initialValue: week.savings)
     }
 
-    private var savings: Double {
-        income - mom - bills - allowance - extraExpenses
+    private var remainingAfterAllocations: Double {
+        income - mom - bills - allowance - extraExpenses - savings
     }
 
     var body: some View {
@@ -78,27 +80,44 @@ struct EditWeekView: View {
                     }
                 }
 
-                // Savings Section (Calculated)
-                Section("Updated Savings") {
+                Section("Savings") {
                     HStack {
                         Image(systemName: "banknote.fill")
                             .foregroundColor(.green)
                         Text("To Save")
                         Spacer()
-                        Text(savings.asPHP)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(savings >= 0 ? .green : .red)
+                        TextField("0", value: $savings, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
                     }
-                    .padding(.vertical, 4)
 
-                    if savings < week.savings {
+                    HStack {
+                        Text("Goal: \(BudgetConfig.savingsGoal.asPHP)/week")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        if savings >= BudgetConfig.savingsGoal {
+                            Label("On track", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Label("\((BudgetConfig.savingsGoal - savings).asPHP) short", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+
+                    if remainingAfterAllocations != 0 {
                         HStack {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .foregroundColor(.red)
-                            Text("Reduced by \((week.savings - savings).asPHP)")
-                                .foregroundColor(.red)
-                                .font(.subheadline)
+                            Text("Unallocated")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(remainingAfterAllocations.asPHP)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(remainingAfterAllocations >= 0 ? .green : .red)
                         }
                     }
                 }

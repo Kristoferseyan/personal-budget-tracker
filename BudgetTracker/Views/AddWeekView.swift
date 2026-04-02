@@ -11,10 +11,11 @@ struct AddWeekView: View {
     @State private var allowance: Double = BudgetConfig.defaultAllowance
     @State private var extraExpenses: Double = 0
     @State private var extraExpensesNote: String = ""
+    @State private var savings: Double = BudgetConfig.defaultSavings
     @State private var date: Date = .now
 
-    private var savings: Double {
-        income - mom - bills - allowance - extraExpenses
+    private var remainingAfterAllocations: Double {
+        income - mom - bills - allowance - extraExpenses - savings
     }
 
     var body: some View {
@@ -64,19 +65,46 @@ struct AddWeekView: View {
                     }
                 }
 
-                // Savings Section (Calculated)
                 Section("Savings") {
                     HStack {
                         Image(systemName: "banknote.fill")
                             .foregroundColor(.green)
                         Text("To Save")
                         Spacer()
-                        Text(savings.asPHP)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(savings >= 0 ? .green : .red)
+                        TextField("0", value: $savings, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
                     }
-                    .padding(.vertical, 4)
+
+                    HStack {
+                        Text("Goal: \(BudgetConfig.savingsGoal.asPHP)/week")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        if savings >= BudgetConfig.savingsGoal {
+                            Label("On track", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Label("\((BudgetConfig.savingsGoal - savings).asPHP) short", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+
+                    if remainingAfterAllocations != 0 {
+                        HStack {
+                            Text("Unallocated")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(remainingAfterAllocations.asPHP)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(remainingAfterAllocations >= 0 ? .green : .red)
+                        }
+                    }
                 }
 
                 // Summary
@@ -93,15 +121,17 @@ struct AddWeekView: View {
                             SummaryRow(label: "Extra Expenses", amount: -extraExpenses)
                         }
 
+                        SummaryRow(label: "Savings", amount: -savings)
+
                         Divider()
 
                         HStack {
-                            Text("Savings")
+                            Text("Remaining")
                                 .fontWeight(.semibold)
                             Spacer()
-                            Text(savings.asPHP)
+                            Text(remainingAfterAllocations.asPHP)
                                 .fontWeight(.bold)
-                                .foregroundColor(.green)
+                                .foregroundColor(remainingAfterAllocations >= 0 ? .green : .red)
                         }
                     }
                     .padding(.vertical, 4)
